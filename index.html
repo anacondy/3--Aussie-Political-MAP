@@ -126,9 +126,37 @@
         .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before,
         .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { display: none; }
 
+        /* Close button for mobile sidebar */
+        .close-btn {
+            display: none;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            z-index: 10;
+            padding: 0;
+            line-height: 32px;
+            text-align: center;
+            transition: background 0.2s ease;
+        }
+        
+        .close-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
         /* --- MOBILE OPTIMIZATIONS --- */
         /* Mobile devices (phones in portrait/landscape) */
         @media only screen and (max-width: 768px) {
+            .close-btn {
+                display: block;
+            }
             .glass-header {
                 top: 10px;
                 left: 10px;
@@ -195,31 +223,11 @@
                 font-size: 10px;
                 padding: 4px 8px;
             }
-        }
-        
-        /* Tablets (portrait and landscape) */
-        @media only screen and (min-width: 769px) and (max-width: 1024px) {
-            .glass-header {
-                width: 280px;
-                padding: 18px;
-            }
             
-            .glass-header h1 {
-                font-size: 22px;
-            }
-            
-            .info-sidebar {
-                width: 320px;
-            }
-            
-            .sidebar-title {
-                font-size: 28px;
-            }
-        }
-        
-        /* 16:9 and 20:9 Mobile Displays Optimization */
-        @media only screen and (max-width: 768px) and (orientation: portrait) {
             /* Portrait mode - Stack elements vertically */
+        }
+        
+        @media only screen and (max-width: 768px) and (orientation: portrait) {
             .glass-header {
                 width: calc(100% - 20px);
             }
@@ -235,16 +243,6 @@
             .info-sidebar {
                 width: 50%;
                 max-width: 400px;
-            }
-        }
-        
-        /* High DPI displays */
-        @media only screen and (-webkit-min-device-pixel-ratio: 2),
-               only screen and (min-resolution: 192dpi) {
-            .glass-header,
-            .info-sidebar {
-                -webkit-font-smoothing: antialiased;
-                -moz-osx-font-smoothing: grayscale;
             }
         }
         
