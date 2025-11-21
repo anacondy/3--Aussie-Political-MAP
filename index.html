@@ -2,19 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="theme-color" content="#050505">
+    <meta name="description" content="Interactive map showing Australian political governance and legislative control across all states and territories as of November 2025">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Australia Governance Map 2025</title>
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
 
     <style>
         /* --- 1. GLOBAL & LAYOUT --- */
+        * {
+            box-sizing: border-box;
+        }
+        
         body, html {
             height: 100%;
             margin: 0;
             background-color: #050505;
             font-family: 'Inter', sans-serif;
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         #map {
@@ -23,6 +37,7 @@
             z-index: 1;
             background: #050505;
             outline: none;
+            touch-action: manipulation;
         }
 
         path.leaflet-interactive:focus { outline: none; }
@@ -111,6 +126,145 @@
         .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before,
         .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { display: none; }
 
+        /* Close button for mobile sidebar */
+        .close-btn {
+            display: none;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            z-index: 10;
+            padding: 0;
+            line-height: 32px;
+            text-align: center;
+            transition: background 0.2s ease;
+        }
+        
+        .close-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* --- MOBILE OPTIMIZATIONS --- */
+        /* Mobile devices (phones in portrait/landscape) */
+        @media only screen and (max-width: 768px) {
+            .close-btn {
+                display: block;
+            }
+            .glass-header {
+                top: 10px;
+                left: 10px;
+                width: calc(100% - 20px);
+                max-width: 340px;
+                padding: 15px;
+                border-radius: 12px;
+            }
+            
+            .glass-header h1 {
+                font-size: 20px;
+                letter-spacing: -0.3px;
+            }
+            
+            .glass-header p {
+                font-size: 11px;
+                margin-top: 3px;
+            }
+            
+            .info-sidebar {
+                top: 0;
+                bottom: 0;
+                right: -100%;
+                width: 100%;
+                max-width: 100vw;
+                border-radius: 0;
+                padding: 20px;
+                border-left: none;
+            }
+            
+            .info-sidebar.active {
+                right: 0;
+            }
+            
+            .sidebar-title {
+                font-size: 26px;
+                margin-bottom: 15px;
+            }
+            
+            .data-section {
+                margin-bottom: 20px;
+                padding-bottom: 12px;
+            }
+            
+            .data-label {
+                font-size: 10px;
+                margin-bottom: 6px;
+            }
+            
+            .data-value {
+                font-size: 15px;
+            }
+            
+            .seat-breakdown {
+                font-size: 12px;
+            }
+            
+            .state-badge {
+                padding: 3px 10px;
+                font-size: 11px;
+            }
+            
+            .leaflet-tooltip.glass-tooltip {
+                font-size: 10px;
+                padding: 4px 8px;
+            }
+            
+            /* Portrait mode - Stack elements vertically */
+        }
+        
+        @media only screen and (max-width: 768px) and (orientation: portrait) {
+            .glass-header {
+                width: calc(100% - 20px);
+            }
+        }
+        
+        @media only screen and (max-width: 768px) and (orientation: landscape) {
+            /* Landscape mode - Optimize for wider screens */
+            .glass-header {
+                width: auto;
+                max-width: 280px;
+            }
+            
+            .info-sidebar {
+                width: 50%;
+                max-width: 400px;
+            }
+        }
+        
+        /* Touch device optimizations */
+        @media (hover: none) and (pointer: coarse) {
+            .glass-header {
+                user-select: none;
+                -webkit-user-select: none;
+                -webkit-touch-callout: none;
+            }
+            
+            .info-sidebar {
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Increase touch targets for mobile */
+            path.leaflet-interactive {
+                cursor: pointer;
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -121,6 +275,7 @@
     </div>
 
     <div id="sidebar" class="info-sidebar">
+        <button id="close-sidebar" class="close-btn" style="display: none; position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; z-index: 10; padding: 0; line-height: 32px; text-align: center;">&times;</button>
         <div id="sidebar-content"></div>
     </div>
 
@@ -128,12 +283,30 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // --- MOBILE DETECTION & UI SETUP ---
+        const isMobile = window.innerWidth <= 768;
+        const closeBtn = document.getElementById('close-sidebar');
+        
+        if (isMobile && closeBtn) {
+            closeBtn.style.display = 'block';
+            closeBtn.addEventListener('click', function() {
+                document.getElementById('sidebar').classList.remove('active');
+            });
+        }
+        
         // --- 1. SETUP MAP ---
         var map = L.map('map', {
             zoomControl: false,
             attributionControl: false,
             center: [-27, 133],
-            zoom: 4
+            zoom: isMobile ? 3.5 : 4,
+            minZoom: isMobile ? 3 : 3,
+            maxZoom: 10,
+            zoomSnap: 0.5,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 120,
+            tap: true,
+            tapTolerance: 15
         });
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -279,7 +452,8 @@
             var layer = e.target;
             const rawName = layer.feature.properties.STATE_NAME || layer.feature.properties.name;
             const name = normalizeStateName(rawName);
-            map.flyToBounds(layer.getBounds(), { padding: [50, 50], duration: 1.2 });
+            const padding = isMobile ? [20, 20] : [50, 50];
+            map.flyToBounds(layer.getBounds(), { padding: padding, duration: 1.2 });
             updateSidebar(name);
             document.getElementById('sidebar').classList.add('active');
         }
@@ -349,20 +523,52 @@
         map.on('click', function(e) {
              if (e.originalEvent.target.id === 'map') {
                  document.getElementById('sidebar').classList.remove('active');
-                 map.flyTo([-27, 133], 4);
+                 const defaultZoom = isMobile ? 3.5 : 4;
+                 map.flyTo([-27, 133], defaultZoom);
              }
         });
 
         // --- 6. LOAD GEOJSON ---
+        // Show loading indicator
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 14px; z-index: 2000; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 8px;';
+        loadingIndicator.textContent = 'Loading map data...';
+        document.body.appendChild(loadingIndicator);
+        
         fetch('https://raw.githubusercontent.com/rowanhogan/australian-states/master/states.geojson')
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to load GeoJSON');
+                return res.json();
+            })
             .then(data => {
                 geojson = L.geoJson(data, {
                     style: style,
                     onEachFeature: onEachFeature
                 }).addTo(map);
+                
+                // Remove loading indicator
+                if (loadingIndicator.parentNode) {
+                    loadingIndicator.parentNode.removeChild(loadingIndicator);
+                }
             })
-            .catch(err => console.error("GeoJSON Failed to Load:", err));
+            .catch(err => {
+                console.error("GeoJSON Failed to Load:", err);
+                loadingIndicator.textContent = 'Failed to load map data. Please refresh.';
+                loadingIndicator.style.background = 'rgba(255, 0, 0, 0.8)';
+            });
+        
+        // Window resize handler for responsive updates
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                map.invalidateSize();
+                const newIsMobile = window.innerWidth <= 768;
+                if (closeBtn) {
+                    closeBtn.style.display = newIsMobile ? 'block' : 'none';
+                }
+            }, 250);
+        });
 
     </script>
 </body>
