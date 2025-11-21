@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Australia Governance Map 2025</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- 1. GLOBAL & LAYOUT --- */
+        body, html {
+            height: 100%;
+            margin: 0;
+            background-color: #050505;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+            z-index: 1;
+            background: #050505;
+            outline: none;
+        }
+
+        path.leaflet-interactive:focus { outline: none; }
+
+        /* --- 2. UI ELEMENTS --- */
+        .glass-header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            width: 320px;
+            padding: 20px;
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            color: white;
+            pointer-events: none;
+        }
+
+        .glass-header h1 { margin: 0; font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
+        .glass-header p { margin: 5px 0 0 0; font-size: 13px; color: #888; }
+
+        .info-sidebar {
+            position: absolute;
+            top: 20px;
+            right: -400px;
+            bottom: 20px;
+            width: 340px; /* Widened slightly for seat data */
+            z-index: 1001;
+            background: rgba(15, 15, 15, 0.8);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px 0 0 20px;
+            padding: 30px;
+            color: white;
+            transition: right 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -20px 0 50px rgba(0,0,0,0.5);
+        }
+        .info-sidebar.active { right: 0; }
+
+        .state-badge { display: inline-block; padding: 4px 12px; border-radius: 50px; font-size: 12px; font-weight: 600; margin-bottom: 10px; text-transform: uppercase; }
+
+        /* Party Colors */
+        .badge-alp { background: rgba(255, 51, 51, 0.15); color: #FF3333; border: 1px solid rgba(255, 51, 51, 0.4); }
+        .badge-lnp { background: rgba(0, 102, 255, 0.15); color: #0066FF; border: 1px solid rgba(0, 102, 255, 0.4); }
+        .badge-grn { background: rgba(0, 204, 102, 0.15); color: #00CC66; border: 1px solid rgba(0, 204, 102, 0.4); }
+
+        .sidebar-title { font-size: 32px; font-weight: 800; margin: 0 0 20px 0; line-height: 1.1; }
+        .data-section { margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+        .data-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 8px; }
+        .data-value { font-size: 16px; font-weight: 500; }
+
+        /* Seat Count Styling */
+        .seat-breakdown {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .seat-gov { color: #fff; font-weight: bold; }
+        .seat-opp { color: #888; }
+
+        /* Hover Tooltip */
+        .leaflet-tooltip.glass-tooltip {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before,
+        .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { display: none; }
+
+    </style>
+</head>
+<body>
+
+    <div class="glass-header">
+        <h1>Australia Governance</h1>
+        <p>Legislative Control & Seats (Nov 2025)</p>
+    </div>
+
+    <div id="sidebar" class="info-sidebar">
+        <div id="sidebar-content"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // --- 1. SETUP MAP ---
+        var map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false,
+            center: [-27, 133],
+            zoom: 4
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // --- 2. POLITICAL DATA (Nov 2025 Snapshot) ---
+        // Sources: WA 2025 Election, QLD 2024 Election, NT 2024 Election, ACT 2024 Election
+
+        const politicalData = {
+            "New South Wales": {
+                code: "L",
+                premier: "Chris Minns",
+                party: "Labor",
+                status: "Minority Govt",
+                seats_gov: "46 (Labor)",
+                seats_opp: "35 (Coalition)",
+                seats_other: "12 (Crossbench)",
+                total_seats: "93"
+            },
+            "Victoria": {
+                code: "L",
+                premier: "Jacinta Allan",
+                party: "Labor",
+                status: "Majority",
+                seats_gov: "54 (Labor)",
+                seats_opp: "29 (Coalition)",
+                seats_other: "5 (Crossbench)",
+                total_seats: "88"
+            },
+            "Queensland": {
+                code: "C",
+                premier: "David Crisafulli",
+                party: "LNP",
+                status: "Majority",
+                seats_gov: "52 (LNP)",
+                seats_opp: "36 (Labor)",
+                seats_other: "5 (KAP/Grn/Ind)",
+                total_seats: "93"
+            },
+            "Western Australia": {
+                code: "L",
+                premier: "Roger Cook",
+                party: "Labor",
+                status: "Majority",
+                seats_gov: "46 (Labor)",
+                seats_opp: "13 (Lib/Nat)",
+                seats_other: "0",
+                total_seats: "59"
+            },
+            "South Australia": {
+                code: "L",
+                premier: "Peter Malinauskas",
+                party: "Labor",
+                status: "Majority",
+                seats_gov: "28 (Labor)",
+                seats_opp: "13 (Liberal)",
+                seats_other: "6 (Ind)",
+                total_seats: "47"
+            },
+            "Tasmania": {
+                code: "C",
+                premier: "Jeremy Rockliff",
+                party: "Liberal",
+                status: "Minority Govt",
+                seats_gov: "14 (Liberal)",
+                seats_opp: "10 (Labor)",
+                seats_other: "11 (Grn/JLN/Ind)",
+                total_seats: "35"
+            },
+            "Northern Territory": {
+                code: "C",
+                premier: "Lia Finocchiaro",
+                party: "Country Liberal (CLP)",
+                status: "Majority",
+                seats_gov: "17 (CLP)",
+                seats_opp: "4 (Labor)",
+                seats_other: "4 (Ind/Grn)",
+                total_seats: "25"
+            },
+            "Australian Capital Territory": {
+                code: "L",
+                premier: "Andrew Barr",
+                party: "Labor / Greens",
+                status: "Coalition Govt",
+                seats_gov: "14 (Lab/Grn)",
+                seats_opp: "9 (Liberal)",
+                seats_other: "2 (Ind)",
+                total_seats: "25"
+            }
+        };
+
+        // --- 3. HELPER FUNCTIONS ---
+        function normalizeStateName(rawName) {
+            if (!rawName) return "";
+            const n = rawName.toString().toLowerCase().trim();
+            if (n === "new south wales" || n === "nsw" || n === "n.s.w.") return "New South Wales";
+            if (n === "victoria" || n === "vic" || n === "vic.") return "Victoria";
+            if (n === "queensland" || n === "qld" || n === "qld.") return "Queensland";
+            if (n === "western australia" || n === "wa" || n === "w.a.") return "Western Australia";
+            if (n === "south australia" || n === "sa" || n === "s.a.") return "South Australia";
+            if (n === "tasmania" || n === "tas" || n === "tas.") return "Tasmania";
+            if (n === "northern territory" || n === "nt" || n === "n.t.") return "Northern Territory";
+            if (n.includes("capital") || n === "act") return "Australian Capital Territory";
+            return rawName;
+        }
+
+        function getColor(rawName) {
+            const name = normalizeStateName(rawName);
+            const data = politicalData[name];
+            if (!data) return '#333';
+            switch(data.code) {
+                case 'L': return '#FF3333';
+                case 'C': return '#0066FF';
+                default:  return '#555';
+            }
+        }
+
+        function style(feature) {
+            const rawName = feature.properties.STATE_NAME || feature.properties.name || feature.properties.Name;
+            return {
+                fillColor: getColor(rawName),
+                weight: 1,
+                opacity: 1,
+                color: getColor(rawName),
+                fillOpacity: 0.15
+            };
+        }
+
+        // --- 4. INTERACTION ---
+        function highlightFeature(e) {
+            var layer = e.target;
+            layer.setStyle({ weight: 3, color: '#fff', fillOpacity: 0.5 });
+            layer.bringToFront();
+        }
+
+        function resetHighlight(e) {
+            geojson.resetStyle(e.target);
+        }
+
+        function zoomToFeature(e) {
+            var layer = e.target;
+            const rawName = layer.feature.properties.STATE_NAME || layer.feature.properties.name;
+            const name = normalizeStateName(rawName);
+            map.flyToBounds(layer.getBounds(), { padding: [50, 50], duration: 1.2 });
+            updateSidebar(name);
+            document.getElementById('sidebar').classList.add('active');
+        }
+
+        function onEachFeature(feature, layer) {
+            const rawName = feature.properties.STATE_NAME || feature.properties.name;
+            const name = normalizeStateName(rawName);
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: zoomToFeature
+            });
+            if (name) {
+                layer.bindTooltip(name, {
+                    permanent: false,
+                    direction: "center",
+                    className: "glass-tooltip"
+                });
+            }
+        }
+
+        // --- 5. SIDEBAR ---
+        function updateSidebar(stateName) {
+            const data = politicalData[stateName];
+            if (!data) {
+                document.getElementById('sidebar-content').innerHTML = `<h2 class="sidebar-title">${stateName}</h2><p style="color:#888">Data not available.</p>`;
+                return;
+            }
+
+            let badgeClass = data.code === 'L' ? 'badge-alp' : 'badge-lnp';
+
+            const html = `
+                <span class="state-badge ${badgeClass}">${data.party}</span>
+                <h2 class="sidebar-title">${stateName}</h2>
+
+                <div class="data-section">
+                    <div class="data-label">Premier / Chief Minister</div>
+                    <div class="data-value">${data.premier}</div>
+                </div>
+
+                <div class="data-section">
+                    <div class="data-label">Government Status</div>
+                    <div class="data-value">${data.status}</div>
+                </div>
+
+                <div class="data-section">
+                    <div class="data-label">Legislative Assembly Seats</div>
+                    <div style="margin-bottom: 5px; color: #fff;">
+                        <span class="seat-gov">${data.seats_gov}</span>
+                    </div>
+                    <div class="seat-breakdown">
+                        <span class="seat-opp">Opp: ${data.seats_opp}</span>
+                    </div>
+                     <div class="seat-breakdown">
+                        <span style="color:#666">Oth: ${data.seats_other}</span>
+                        <span style="color:#444">Total: ${data.total_seats}</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; font-size: 11px; color: #555;">
+                    *Reflects Nov 2025 State/Territory Parliaments.
+                </div>
+            `;
+            document.getElementById('sidebar-content').innerHTML = html;
+        }
+
+        map.on('click', function(e) {
+             if (e.originalEvent.target.id === 'map') {
+                 document.getElementById('sidebar').classList.remove('active');
+                 map.flyTo([-27, 133], 4);
+             }
+        });
+
+        // --- 6. LOAD GEOJSON ---
+        fetch('https://raw.githubusercontent.com/rowanhogan/australian-states/master/states.geojson')
+            .then(res => res.json())
+            .then(data => {
+                geojson = L.geoJson(data, {
+                    style: style,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+            })
+            .catch(err => console.error("GeoJSON Failed to Load:", err));
+
+    </script>
+</body>
+</html>
