@@ -383,10 +383,21 @@
                 dragHandle.addEventListener('touchend', handleTouchEnd, { passive: true });
             }
             
-            // Also allow closing by tapping the drag handle
+            // Also allow closing by tapping the drag handle (prevent double-trigger with touch events)
             if (dragHandle) {
-                dragHandle.addEventListener('click', function() {
+                let lastTouchEnd = 0;
+                dragHandle.addEventListener('click', function(e) {
+                    // Prevent click if touch just ended (within 300ms)
+                    if (Date.now() - lastTouchEnd < 300) {
+                        e.preventDefault();
+                        return;
+                    }
                     sidebar.classList.remove('active');
+                });
+                
+                // Track touch end time to prevent double triggering
+                dragHandle.addEventListener('touchend', function() {
+                    lastTouchEnd = Date.now();
                 });
             }
         }
@@ -573,10 +584,13 @@
                 });
             } else {
                 // Desktop: Use right padding for sidebar
-                const padding = [50, 50];
+                // Sidebar width (340px) + padding (30px) + extra buffer (10px) = 380px
+                const sidebarWidth = 340;
+                const sidebarPadding = 30;
+                const rightPadding = sidebarWidth + sidebarPadding + 10;
                 map.flyToBounds(bounds, { 
                     paddingTopLeft: [50, 50],
-                    paddingBottomRight: [380, 50], // Account for sidebar width
+                    paddingBottomRight: [rightPadding, 50],
                     duration: 1.2 
                 });
             }
