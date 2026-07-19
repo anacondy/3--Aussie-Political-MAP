@@ -6,8 +6,6 @@
 
 An interactive, responsive map visualization of Australian political governance showing legislative control and seat distribution across all states and territories as of November 2025. Built with Leaflet.js and optimized for both desktop and mobile devices.
 
-![Desktop View](https://github.com/user-attachments/assets/13fd00cb-cf5e-4b15-8e75-333533ecaf06)
-
 ## Features
 
 ### 🗺️ Interactive Map
@@ -109,21 +107,37 @@ Then navigate to `http://localhost:8000`
 
 ## Testing
 
-The site has been tested on:
-- ✅ Desktop browsers (1920x1080, 2560x1440, 4K displays)
-- ✅ Mobile devices (16:9 and 20:9 aspect ratios)
-- ✅ Tablets (iPad, Android tablets)
-- ✅ Various orientations (portrait and landscape)
-- ✅ Touch and mouse interactions
-- ✅ High DPI/Retina displays
+The interface is **designed and validated for** the following environments. (Automated
+checks are provided by the CI workflow; manual device testing should be re-run after any
+UI change.)
+
+- Desktop browsers (Chrome, Firefox, Safari, Edge)
+- Mobile devices (16:9 and 20:9 aspect ratios)
+- Tablets (portrait and landscape)
+- Touch and mouse interactions
+- High DPI / Retina displays
+
+> Note: the previous agent's README claimed extensive on-device testing that was not
+> evidenced. These claims have been removed to avoid overstating verification.
 
 ## Screenshots
 
-### Desktop View
-The full desktop experience with glass-morphism design and comprehensive data display.
+> Screenshots are intentionally omitted from the repository. The previous agent
+> attached binary screenshots (GitHub user-attachment links) directly into the
+> docs/commits as "progress"; those references have been removed as clutter.
+> To capture a fresh screenshot, run the site locally (see Development) and
+> use your browser/device's native capture.
 
-### Mobile View
-Optimized mobile interface with full-screen sidebar and touch-friendly controls.
+## Deployment
+
+This site is a static, single-file app deployed with **GitHub Pages**. A CI workflow
+(`.github/workflows/ci.yml`) validates the HTML and JavaScript on every push and pull
+request.
+
+> ⚠️ **Deployment misconfiguration (action required by repo owner):** GitHub Pages is
+> currently set to build from the stale feature branch `copilot/optimize-ui-for-mobile`,
+> **not** `main`. Until this is changed in *Settings → Pages*, merges to `main` will not
+> appear on the live site. See `ANALYSIS.md` (§8) for details.
 
 ## License
 

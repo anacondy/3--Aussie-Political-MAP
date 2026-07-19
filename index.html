@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <meta name="theme-color" content="#050505">
     <meta name="description" content="Interactive map showing Australian political governance and legislative control across all states and territories as of November 2025">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; img-src 'self' data: https://*.cartocdn.com; connect-src 'self' https://raw.githubusercontent.com https://cdn.jsdelivr.net; frame-ancestors 'none'; object-src 'none'; base-uri 'self'">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -254,7 +255,7 @@
                 padding: 4px 8px;
             }
             
-            /* Hide close button on mobile, use drag handle instead */
+            /* Close button is hidden on mobile (the drag handle is used instead) */
             .close-btn {
                 display: none;
             }
@@ -320,33 +321,41 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // --- MOBILE DETECTION & UI SETUP ---
-        const isMobile = window.innerWidth <= 768;
+        let isMobile = window.innerWidth <= 768;
         const sidebar = document.getElementById('sidebar');
         const closeBtn = document.getElementById('close-sidebar');
         const dragHandle = document.getElementById('drag-handle');
+        let geojson = null; // declared up-front to avoid an implicit global
         
-        // Close button for desktop only
-        if (!isMobile && closeBtn) {
-            closeBtn.style.display = 'block';
+        // Close button: shown on desktop, hidden on mobile (mobile uses the drag handle)
+        function syncCloseButton() {
+            if (!closeBtn) return;
+            closeBtn.style.display = isMobile ? 'none' : 'block';
+        }
+        if (closeBtn) {
             closeBtn.addEventListener('click', function() {
                 sidebar.classList.remove('active');
             });
         }
+        syncCloseButton();
         
-        // Mobile swipe-to-dismiss functionality
-        if (isMobile) {
+        // Mobile swipe-to-dismiss functionality.
+        // Touch events only fire on touch-capable devices, so it is safe to attach
+        // these listeners unconditionally; the handlers no-op on desktop.
+        {
             let startY = 0;
             let currentY = 0;
             let isDragging = false;
             
             const handleTouchStart = function(e) {
+                if (!isMobile) return;
                 startY = e.touches[0].clientY;
                 isDragging = true;
                 sidebar.style.transition = 'none';
             };
             
             const handleTouchMove = function(e) {
-                if (!isDragging) return;
+                if (!isMobile || !isDragging) return;
                 currentY = e.touches[0].clientY;
                 const deltaY = currentY - startY;
                 
@@ -356,8 +365,8 @@
                 }
             };
             
-            const handleTouchEnd = function(e) {
-                if (!isDragging) return;
+            const handleTouchEnd = function() {
+                if (!isMobile || !isDragging) return;
                 isDragging = false;
                 sidebar.style.transition = 'transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)';
                 
@@ -387,6 +396,7 @@
             if (dragHandle) {
                 let lastTouchEnd = 0;
                 dragHandle.addEventListener('click', function(e) {
+                    if (!isMobile) return;
                     // Prevent click if touch just ended (within 300ms)
                     if (Date.now() - lastTouchEnd < 300) {
                         e.preventDefault();
@@ -408,13 +418,11 @@
             attributionControl: false,
             center: [-27, 133],
             zoom: isMobile ? 3.5 : 4,
-            minZoom: isMobile ? 3 : 3,
+            minZoom: 3,
             maxZoom: 10,
             zoomSnap: 0.5,
             zoomDelta: 0.5,
-            wheelPxPerZoomLevel: 120,
-            tap: true,
-            tapTolerance: 15
+            wheelPxPerZoomLevel: 120
         });
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -553,7 +561,7 @@
         }
 
         function resetHighlight(e) {
-            geojson.resetStyle(e.target);
+            if (geojson) geojson.resetStyle(e.target);
         }
 
         function zoomToFeature(e) {
@@ -622,10 +630,19 @@
         }
 
         // --- 5. SIDEBAR ---
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function updateSidebar(stateName) {
             const data = politicalData[stateName];
             if (!data) {
-                document.getElementById('sidebar-content').innerHTML = `<h2 class="sidebar-title">${stateName}</h2><p style="color:#888">Data not available.</p>`;
+                document.getElementById('sidebar-content').innerHTML = `<h2 class="sidebar-title">${escapeHtml(stateName)}</h2><p style="color:#888">Data not available.</p>`;
                 return;
             }
 
@@ -633,7 +650,7 @@
 
             const html = `
                 <span class="state-badge ${badgeClass}">${data.party}</span>
-                <h2 class="sidebar-title">${stateName}</h2>
+                <h2 class="sidebar-title">${escapeHtml(stateName)}</h2>
 
                 <div class="data-section">
                     <div class="data-label">Premier / Chief Minister</div>
@@ -666,15 +683,19 @@
             document.getElementById('sidebar-content').innerHTML = html;
         }
 
+        // Clicking empty map area (ocean/tiles) closes the sidebar and resets the view.
+        // Clicks on a state polygon are handled by zoomToFeature and must NOT close it.
         map.on('click', function(e) {
-             if (e.originalEvent.target.id === 'map') {
-                 document.getElementById('sidebar').classList.remove('active');
-                 if (isMobile) {
-                     sidebar.style.transform = '';
-                 }
-                 const defaultZoom = isMobile ? 3.5 : 4;
-                 map.flyTo([-27, 133], defaultZoom, { duration: 0.8 });
-             }
+            const t = e.originalEvent && e.originalEvent.target;
+            if (t && typeof t.closest === 'function' && t.closest('.leaflet-interactive')) {
+                return;
+            }
+            sidebar.classList.remove('active');
+            if (isMobile) {
+                sidebar.style.transform = '';
+            }
+            const defaultZoom = isMobile ? 3.5 : 4;
+            map.flyTo([-27, 133], defaultZoom, { duration: 0.8 });
         });
 
         // --- 6. LOAD GEOJSON ---
@@ -684,24 +705,53 @@
         loadingIndicator.textContent = 'Loading map data...';
         document.body.appendChild(loadingIndicator);
         
-        fetch('https://raw.githubusercontent.com/rowanhogan/australian-states/master/states.geojson')
-            .then(res => {
-                if (!res.ok) throw new Error('Failed to load GeoJSON');
-                return res.json();
-            })
-            .then(data => {
+        // GeoJSON is loaded from an external source. To avoid a single point of
+        // failure we try several mirrors in order, with a timeout on each request.
+        const GEOJSON_SOURCES = [
+            'https://raw.githubusercontent.com/rowanhogan/australian-states/master/states.geojson',
+            'https://cdn.jsdelivr.net/gh/rowanhogan/australian-states/states.geojson'
+        ];
+
+        function fetchWithTimeout(url, ms) {
+            const opts = { cache: 'no-store' };
+            if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+                opts.signal = AbortSignal.timeout(ms);
+            }
+            return fetch(url, opts);
+        }
+
+        function loadGeoJSON(i) {
+            if (i >= GEOJSON_SOURCES.length) {
+                throw new Error('All GeoJSON sources are unavailable');
+            }
+            return fetchWithTimeout(GEOJSON_SOURCES[i], 15000)
+                .then(function(res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + GEOJSON_SOURCES[i]);
+                    return res.json();
+                })
+                .catch(function(err) {
+                    if (i + 1 < GEOJSON_SOURCES.length) {
+                        console.warn('GeoJSON source failed, using fallback:', GEOJSON_SOURCES[i], err);
+                        return loadGeoJSON(i + 1);
+                    }
+                    throw err;
+                });
+        }
+
+        loadGeoJSON(0)
+            .then(function(data) {
                 geojson = L.geoJson(data, {
                     style: style,
                     onEachFeature: onEachFeature
                 }).addTo(map);
-                
+
                 // Remove loading indicator
                 if (loadingIndicator.parentNode) {
                     loadingIndicator.parentNode.removeChild(loadingIndicator);
                 }
             })
-            .catch(err => {
-                console.error("GeoJSON Failed to Load:", err);
+            .catch(function(err) {
+                console.error('GeoJSON Failed to Load:', err);
                 loadingIndicator.textContent = 'Failed to load map data. Please refresh.';
                 loadingIndicator.style.background = 'rgba(255, 0, 0, 0.8)';
             });
@@ -712,10 +762,8 @@
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(function() {
                 map.invalidateSize();
-                const newIsMobile = window.innerWidth <= 768;
-                if (closeBtn) {
-                    closeBtn.style.display = newIsMobile ? 'block' : 'none';
-                }
+                isMobile = window.innerWidth <= 768;
+                syncCloseButton();
             }, 250);
         });
 
